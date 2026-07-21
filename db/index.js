@@ -33,18 +33,19 @@ try {
   Sequelize = sequelizePkg.Sequelize;
   const DataTypes = sequelizePkg.DataTypes;
 
-  sequelize = new Sequelize(
-    config.db.database,
-    config.db.user,
-    config.db.password,
-    {
-      host: config.db.host,
-      port: config.db.port,
-      dialect: 'postgres',
-      define: { underscored: true },
-      logging: config.env === 'development' ? (msg) => console.log(`[sql] ${msg}`) : false,
-    }
-  );
+  const sequelizeDatabase = process.env.DB_NAME || process.env.PGDATABASE || config.db.database;
+  const sequelizeUser = process.env.DB_USER || process.env.PGUSER || config.db.user;
+  const sequelizePassword = process.env.DB_PASSWORD || process.env.PGPASSWORD || config.db.password;
+  const sequelizeHost = process.env.DB_HOST || process.env.PGHOST || config.db.host;
+  const sequelizePort = parseInt(process.env.DB_PORT || process.env.PGPORT || config.db.port, 10) || 5432;
+
+  sequelize = new Sequelize(sequelizeDatabase, sequelizeUser, sequelizePassword, {
+    host: sequelizeHost,
+    port: sequelizePort,
+    dialect: 'postgres',
+    define: { underscored: true },
+    logging: config.env === 'development' ? (msg) => console.log(`[sql] ${msg}`) : false,
+  });
 
   const User = require('../models/user')(sequelize, DataTypes);
   const Product = require('../models/product')(sequelize, DataTypes);
