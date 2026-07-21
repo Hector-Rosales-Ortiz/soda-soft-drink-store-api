@@ -50,6 +50,8 @@ test('Express app serves health and 404 responses', async () => {
     delete require.cache[require.resolve('../routes')];
     delete require.cache[require.resolve('../loaders/express')];
 
+    delete require.cache[require.resolve('../routes')];
+    delete require.cache[require.resolve('../loaders/express')];
     if (originalDbName === undefined) {
       delete process.env.DB_NAME;
     } else {
