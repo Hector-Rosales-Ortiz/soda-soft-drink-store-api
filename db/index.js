@@ -6,11 +6,11 @@ require('dotenv').config();
 const config = require('../config');
 
 const pool = new Pool({
-  user: process.env.DB_USER || process.env.PGUSER || config.db.user,
-  host: process.env.DB_HOST || process.env.PGHOST || config.db.host,
-  database: process.env.DB_NAME || process.env.PGDATABASE || config.db.database,
-  password: process.env.DB_PASSWORD || process.env.PGPASSWORD || config.db.password,
-  port: parseInt(process.env.DB_PORT || process.env.PGPORT || config.db.port, 10) || 5432,
+  user: config.db.user,
+  host: config.db.host,
+  database: config.db.database,
+  password: config.db.password,
+  port: config.db.port,
 });
 
 // Test a one-time connection when this module is loaded.

@@ -12,11 +12,11 @@ const config = {
   port: parseInt(process.env.PORT, 10) || 4001,
 
   db: {
-    host: process.env.PGHOST || 'localhost',
-    port: parseInt(process.env.PGPORT, 10) || 5432,
-    database: process.env.PGDATABASE || 'soda_store',
-    user: process.env.PGUSER || 'postgres',
-    password: process.env.PGPASSWORD || 'postgres',
+    host: process.env.DB_HOST || process.env.PGHOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || process.env.PGPORT, 10) || 5432,
+    database: process.env.DB_NAME || process.env.PGDATABASE || 'soda_store',
+    user: process.env.DB_USER || process.env.PGUSER || 'postgres',
+    password: process.env.DB_PASSWORD || process.env.PGPASSWORD || 'postgres',
   },
 
   jwt: {

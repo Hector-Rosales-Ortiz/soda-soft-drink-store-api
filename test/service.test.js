@@ -14,6 +14,10 @@ const servicePaths = [
 ];
 
 function loadService(servicePath, dbExports) {
+  const previousBcrypt = require.cache[bcryptPath];
+  const previousJwt = require.cache[jsonwebtokenPath];
+  const previousDb = require.cache[dbPath];
+
   require.cache[bcryptPath] = {
     id: bcryptPath,
     filename: bcryptPath,
@@ -44,7 +48,27 @@ function loadService(servicePath, dbExports) {
     delete require.cache[path];
   }
 
-  return require(servicePath);
+  const service = require(servicePath);
+
+  if (previousBcrypt) {
+    require.cache[bcryptPath] = previousBcrypt;
+  } else {
+    delete require.cache[bcryptPath];
+  }
+
+  if (previousJwt) {
+    require.cache[jsonwebtokenPath] = previousJwt;
+  } else {
+    delete require.cache[jsonwebtokenPath];
+  }
+
+  if (previousDb) {
+    require.cache[dbPath] = previousDb;
+  } else {
+    delete require.cache[dbPath];
+  }
+
+  return service;
 }
 
 function createStore() {

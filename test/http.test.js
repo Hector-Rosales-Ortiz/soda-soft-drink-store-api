@@ -47,6 +47,8 @@ test('Express app serves health and 404 responses', async () => {
     assert.match((await missingResponse.json()).error, /Not found: GET \/does-not-exist/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
+    delete require.cache[require.resolve('../routes')];
+    delete require.cache[require.resolve('../loaders/express')];
 
     if (originalDbName === undefined) {
       delete process.env.DB_NAME;
