@@ -112,20 +112,22 @@ const createTables = async () => {
 
 async function main() {
   let db;
+  let exitCode = 0;
 
   try {
     await ensureDatabase();
     db = require('./db/index.js');
     await createTables();
-    await db.pool.end();
-    process.exit(0);
   } catch (err) {
     console.error('❌ Error creating database or tables:', err);
+    exitCode = 1;
+  } finally {
     if (db && db.pool) {
-      await db.pool.end().catch(() => {});
+      await db.pool.end().catch((err) => console.error('Pool cleanup error:', err));
     }
-    process.exit(1);
   }
+
+  process.exit(exitCode);
 }
 
 main();
