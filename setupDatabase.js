@@ -1,59 +1,127 @@
 'use strict';
 
-/**
- * Database setup script (Sequelize).
- * Run with `node setupDatabase.js` (or `npm run setup-db`).
- *
- * Creates/updates every table from the model definitions and seeds a handful
- * of soda products so the API has data to serve immediately.
- *
- * Flags:
- *   --force   DROP and recreate all tables (destroys existing data)
- *   --alter   Adjust existing tables to match the models (keeps data)
- */
+const { Pool } = require('pg');
+require('dotenv').config();
 
-const { sequelize, models } = require('./db');
+const targetDatabase = process.env.DB_NAME || process.env.PGDATABASE || 'soda_store';
+const dbConfig = {
+  user: process.env.DB_USER || process.env.PGUSER || 'postgres',
+  host: process.env.DB_HOST || process.env.PGHOST || 'localhost',
+  password: process.env.DB_PASSWORD || process.env.PGPASSWORD || 'postgres',
+  port: parseInt(process.env.DB_PORT || process.env.PGPORT || '5432', 10) || 5432,
+};
 
-const SEED_PRODUCTS = [
-  { name: 'Classic Cola',    description: 'The original crisp cola taste.',    price: 1.99, stock: 100, flavor: 'cola',      size: '330ml' },
-  { name: 'Diet Cola',       description: 'All the flavor, zero sugar.',       price: 1.99, stock: 100, flavor: 'cola',      size: '330ml' },
-  { name: 'Lemon Lime Fizz', description: 'Refreshing citrus soda.',           price: 1.79, stock: 80,  flavor: 'citrus',    size: '330ml' },
-  { name: 'Orange Burst',    description: 'Bold orange soda with real fizz.',  price: 1.89, stock: 75,  flavor: 'orange',    size: '330ml' },
-  { name: 'Root Beer',       description: 'Creamy, old-fashioned root beer.',  price: 2.09, stock: 60,  flavor: 'root beer', size: '330ml' },
-  { name: 'Grape Soda',      description: 'Sweet and bubbly grape flavor.',    price: 1.89, stock: 50,  flavor: 'grape',     size: '330ml' },
-  { name: 'Ginger Ale',      description: 'Smooth ginger with a gentle kick.', price: 1.99, stock: 70,  flavor: 'ginger',    size: '330ml' },
-  { name: 'Cream Soda',      description: 'Smooth vanilla cream soda.',        price: 2.19, stock: 40,  flavor: 'vanilla',   size: '330ml' },
-];
+async function ensureDatabase() {
+  const adminPool = new Pool({
+    ...dbConfig,
+    database: 'postgres',
+  });
 
-async function main() {
-  const force = process.argv.includes('--force');
-  const alter = process.argv.includes('--alter');
+  try {
+    const existsResult = await adminPool.query('SELECT 1 FROM pg_database WHERE datname = $1', [targetDatabase]);
 
-  await sequelize.authenticate();
-  console.log('🗄️  Connected to the database.');
-
-  console.log(`⏳ Syncing tables${force ? ' (force)' : alter ? ' (alter)' : ''}...`);
-  await sequelize.sync({ force, alter });
-  console.log('✅ Tables ready.');
-
-  console.log('⏳ Seeding products...');
-  const existing = await models.Product.count();
-  if (existing === 0) {
-    await models.Product.bulkCreate(SEED_PRODUCTS);
-    console.log(`✅ Seeded ${SEED_PRODUCTS.length} products.`);
-  } else {
-    console.log(`ℹ️  ${existing} products already present — skipped seed.`);
+    if (existsResult.rowCount === 0) {
+      await adminPool.query(`CREATE DATABASE "${targetDatabase.replace(/"/g, '""')}"`);
+      console.log(`✅ Created database ${targetDatabase}`);
+    } else {
+      console.log(`ℹ️  Database ${targetDatabase} already exists`);
+    }
+  } finally {
+    await adminPool.end();
   }
 }
 
-main()
-  .then(async () => {
-    await sequelize.close();
-    console.log('🎉 Database setup complete.');
+const createTables = async () => {
+  const db = require('./db/index.js');
+
+  try {
+    console.log('🔄 Creating database tables...');
+
+    // Users table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        first_name VARCHAR(100) NOT NULL,
+        last_name VARCHAR(100) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Products table (soda drinks)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(150) NOT NULL,
+        description TEXT,
+        price DECIMAL(10,2) NOT NULL,
+        category VARCHAR(100),
+        image_url TEXT,
+        stock_quantity INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Carts table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS carts (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Cart Items table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS cart_items (
+        id SERIAL PRIMARY KEY,
+        cart_id INT NOT NULL REFERENCES carts(id) ON DELETE CASCADE,
+        product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        quantity INT NOT NULL DEFAULT 1,
+        UNIQUE(cart_id, product_id)
+      );
+    `);
+
+    // Orders table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        total_amount DECIMAL(10,2) NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Order Items table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS order_items (
+        id SERIAL PRIMARY KEY,
+        order_id INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        quantity INT NOT NULL,
+        price_at_purchase DECIMAL(10,2) NOT NULL
+      );
+    `);
+
+    console.log('✅ All tables created successfully!');
     process.exit(0);
-  })
-  .catch(async (err) => {
-    console.error('❌ Database setup failed:', err.message);
-    await sequelize.close().catch(() => {});
+  } catch (err) {
+    console.error('❌ Error creating tables:', err);
     process.exit(1);
-  });
+  }
+};
+
+async function main() {
+  try {
+    await ensureDatabase();
+    await createTables();
+  } catch (err) {
+    console.error('❌ Error creating database or tables:', err);
+    process.exit(1);
+  }
+}
+
+main();

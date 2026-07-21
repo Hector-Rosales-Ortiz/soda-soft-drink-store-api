@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "setup-db": "node setupDatabase.js"
+    "setup-db": "node setupDatabase.js",
+    "test": "node --test"
   },
   "keywords": [
     "ecommerce",

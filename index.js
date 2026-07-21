@@ -4,7 +4,7 @@ const express = require('express');
 
 const config = require('./config');
 const loaders = require('./loaders');
-const { sequelize } = require('./db');
+const { confirmPostgresConnection } = require('./db');
 
 /**
  * Application entry point.
@@ -14,7 +14,7 @@ const { sequelize } = require('./db');
 async function start() {
   // Fail fast with a clear message if the database is unreachable.
   try {
-    await sequelize.authenticate();
+    await confirmPostgresConnection();
     console.log('🗄️  Database connection OK');
   } catch (err) {
     console.error('❌ Unable to connect to the database:', err.message);

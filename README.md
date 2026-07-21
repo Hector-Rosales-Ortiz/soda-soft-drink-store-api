@@ -59,6 +59,21 @@ npm run setup-db
 npm start          # or: npm run dev  (auto-reload with nodemon)
 ```
 
+## Testing
+
+The project uses Node's built-in test runner. Run the suite with:
+
+```bash
+npm test
+```
+
+The test coverage currently includes:
+
+- PostgreSQL setup verification via `setupDatabase.js`
+- An Express smoke test for `/health` and the 404 handler
+
+See [TESTING.md](TESTING.md) for the full test workflow and environment notes.
+
 The server prints its URL on boot (default <http://localhost:4001>).
 Interactive docs:
 
