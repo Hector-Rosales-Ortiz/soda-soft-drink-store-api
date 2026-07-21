@@ -4,14 +4,25 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const config = require('../config');
-const User = require('../models/user');
-const Cart = require('../models/cart');
+const { models } = require('../db');
+
+const { User, Cart } = models;
 
 /** Build an Error carrying an HTTP status for the central error handler. */
 function httpError(status, message) {
   const err = new Error(message);
   err.status = status;
   return err;
+}
+
+/** Shape a User model instance into the public API representation. */
+function publicUser(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    created_at: user.createdAt,
+  };
 }
 
 const SALT_ROUNDS = 10;
@@ -25,7 +36,7 @@ async function register({ email, name, password }) {
     throw httpError(400, 'name, email and password are required');
   }
 
-  const existing = await User.findByEmailWithHash(email);
+  const existing = await User.findOne({ where: { email } });
   if (existing) {
     throw httpError(409, 'An account with that email already exists');
   }
@@ -34,9 +45,9 @@ async function register({ email, name, password }) {
   const user = await User.create({ email, name, passwordHash });
 
   // Every user starts with an active cart.
-  await Cart.findOrCreateByUserId(user.id);
+  await Cart.findOrCreate({ where: { userId: user.id } });
 
-  return { user, token: signToken(user) };
+  return { user: publicUser(user), token: signToken(user) };
 }
 
 /**
@@ -48,23 +59,18 @@ async function login({ email, password }) {
     throw httpError(400, 'email and password are required');
   }
 
-  const record = await User.findByEmailWithHash(email);
-  if (!record) {
+  // Use the withPassword scope so the hash is available for comparison.
+  const user = await User.scope('withPassword').findOne({ where: { email } });
+  if (!user) {
     throw httpError(401, 'Invalid email or password');
   }
 
-  const ok = await bcrypt.compare(password, record.password_hash);
+  const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) {
     throw httpError(401, 'Invalid email or password');
   }
 
-  const user = {
-    id: record.id,
-    email: record.email,
-    name: record.name,
-    created_at: record.created_at,
-  };
-  return { user, token: signToken(user) };
+  return { user: publicUser(user), token: signToken(user) };
 }
 
 function signToken(user) {
@@ -79,4 +85,5 @@ module.exports = {
   register,
   login,
   httpError,
+  publicUser,
 };

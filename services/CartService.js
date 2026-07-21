@@ -1,20 +1,49 @@
 'use strict';
 
-const Cart = require('../models/cart');
-const CartItem = require('../models/cartItem');
-const Product = require('../models/product');
+const { models } = require('../db');
 const { httpError } = require('./AuthService');
 
+const { Cart, CartItem, Product } = models;
+
 /**
- * Cart business logic. All operations are scoped to a single user.
+ * Cart business logic (backed by Sequelize). All operations are scoped to a
+ * single user.
  */
+
+/** Return the user's cart row, creating one on first access. */
+async function getOrCreateCart(userId) {
+  const [cart] = await Cart.findOrCreate({ where: { userId } });
+  return cart;
+}
+
+/** Shape a CartItem (with its included Product) into the API representation. */
+function cartItemDTO(item) {
+  const product = item.Product;
+  const price = Number(product.price);
+  return {
+    id: item.id,
+    product_id: item.productId,
+    name: product.name,
+    price,
+    image_url: product.imageUrl,
+    flavor: product.flavor,
+    size: product.size,
+    quantity: item.quantity,
+    line_total: Number((price * item.quantity).toFixed(2)),
+  };
+}
 
 /** Return the user's cart with its line items and a computed total. */
 async function getCart(userId) {
-  const cart = await Cart.findOrCreateByUserId(userId);
-  const items = await CartItem.findByCartId(cart.id);
-  const total = items.reduce((sum, i) => sum + Number(i.line_total), 0);
-  return { id: cart.id, items, total: Number(total.toFixed(2)) };
+  const cart = await getOrCreateCart(userId);
+  const items = await CartItem.findAll({
+    where: { cartId: cart.id },
+    include: [{ model: Product }],
+    order: [['id', 'ASC']],
+  });
+  const dtos = items.map(cartItemDTO);
+  const total = dtos.reduce((sum, i) => sum + i.line_total, 0);
+  return { id: cart.id, items: dtos, total: Number(total.toFixed(2)) };
 }
 
 async function addItem(userId, { productId, quantity = 1 }) {
@@ -24,12 +53,24 @@ async function addItem(userId, { productId, quantity = 1 }) {
     throw httpError(400, 'quantity must be a positive integer');
   }
 
-  const product = await Product.findById(productId);
+  const product = await Product.findByPk(productId);
   if (!product) throw httpError(404, 'Product not found');
-  if (product.stock < qty) throw httpError(409, 'Not enough stock available');
 
-  const cart = await Cart.findOrCreateByUserId(userId);
-  await CartItem.upsert(cart.id, productId, qty);
+  const cart = await getOrCreateCart(userId);
+
+  const [item, created] = await CartItem.findOrCreate({
+    where: { cartId: cart.id, productId },
+    defaults: { quantity: qty },
+  });
+
+  const newQty = created ? qty : item.quantity + qty;
+  if (product.stock < newQty) throw httpError(409, 'Not enough stock available');
+
+  if (!created) {
+    item.quantity = newQty;
+    await item.save();
+  }
+
   return getCart(userId);
 }
 
@@ -39,28 +80,35 @@ async function updateItem(userId, productId, quantity) {
     throw httpError(400, 'quantity must be a non-negative integer');
   }
 
-  const cart = await Cart.findOrCreateByUserId(userId);
+  const cart = await getOrCreateCart(userId);
+  const item = await CartItem.findOne({ where: { cartId: cart.id, productId } });
+  if (!item) throw httpError(404, 'Item not found in cart');
 
   if (qty === 0) {
-    await CartItem.remove(cart.id, productId);
+    await item.destroy();
     return getCart(userId);
   }
 
-  const updated = await CartItem.setQuantity(cart.id, productId, qty);
-  if (!updated) throw httpError(404, 'Item not found in cart');
+  const product = await Product.findByPk(productId);
+  if (product && product.stock < qty) {
+    throw httpError(409, 'Not enough stock available');
+  }
+
+  item.quantity = qty;
+  await item.save();
   return getCart(userId);
 }
 
 async function removeItem(userId, productId) {
-  const cart = await Cart.findOrCreateByUserId(userId);
-  const ok = await CartItem.remove(cart.id, productId);
-  if (!ok) throw httpError(404, 'Item not found in cart');
+  const cart = await getOrCreateCart(userId);
+  const destroyed = await CartItem.destroy({ where: { cartId: cart.id, productId } });
+  if (!destroyed) throw httpError(404, 'Item not found in cart');
   return getCart(userId);
 }
 
 async function clear(userId) {
-  const cart = await Cart.findOrCreateByUserId(userId);
-  await CartItem.clear(cart.id);
+  const cart = await getOrCreateCart(userId);
+  await CartItem.destroy({ where: { cartId: cart.id } });
   return getCart(userId);
 }
 

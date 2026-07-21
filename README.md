@@ -1,7 +1,8 @@
 # 🥤 Soda Soft Drink Store — E-Commerce REST API
 
 A Codecademy portfolio-project REST API for a soda soft-drink store, built with
-**Node.js, Express, PostgreSQL, Passport (JWT)** and documented with **Swagger**.
+**Node.js, Express, PostgreSQL (Sequelize ORM), Passport (JWT)** and documented
+with **Swagger UI** and **Scalar**.
 
 ## Features
 
@@ -10,25 +11,26 @@ A Codecademy portfolio-project REST API for a soda soft-drink store, built with
 - 🛒 **Cart** — add / update / remove items, view totals
 - 📦 **Orders** — transactional checkout with stock reservation & order history
 - 👤 **Users** — view and update your profile
-- 📖 **Swagger docs** at `/api-docs`
+- 🧩 **Sequelize ORM** — models, associations, validations & transactions (no raw SQL)
+- 📖 **Two docs UIs** — Swagger UI at `/api-docs`, Scalar reference at `/reference`
 
 ## Project structure
 
 ```
 soda-soft-drink-store-api/
-├── db/            # PostgreSQL connection pool
-├── loaders/       # Express, Passport & Swagger setup
-├── models/        # Data-access modules (one per table)
+├── db/            # Sequelize connection + model registry & associations
+├── loaders/       # Express, Passport & docs (Swagger UI + Scalar) setup
+├── models/        # Sequelize model definitions (one per table)
 ├── resources/     # ERD diagram & shared assets
 ├── routes/        # HTTP endpoints → services
-├── services/      # Business logic
+├── services/      # Business logic (uses the ORM models)
 ├── config.js      # Env-driven settings
 ├── index.js       # App entry point
-├── setupDatabase.js  # Creates tables + seeds products
-└── swagger.yml    # API documentation
+├── setupDatabase.js  # Syncs tables (sequelize.sync) + seeds products
+└── swagger.yml    # OpenAPI spec (shared by both docs UIs)
 ```
 
-Request flow: **routes → services → models → db**.
+Request flow: **routes → services → models (Sequelize) → db**.
 
 ## Prerequisites
 
@@ -48,15 +50,23 @@ cp example.env .env        # (Windows: copy example.env .env)
 # 3. Create the database (once), e.g. via psql:
 #    CREATE DATABASE soda_store;
 
-# 4. Create tables and seed sample sodas
+# 4. Create tables (from the Sequelize models) and seed sample sodas
 npm run setup-db
+#   Reset everything:   node setupDatabase.js --force
+#   Migrate in place:   node setupDatabase.js --alter
 
 # 5. Start the API
 npm start          # or: npm run dev  (auto-reload with nodemon)
 ```
 
 The server prints its URL on boot (default <http://localhost:4001>).
-Interactive docs: <http://localhost:4001/api-docs>.
+Interactive docs:
+
+- **Scalar** (recommended): <http://localhost:4001/reference>
+- **Swagger UI**: <http://localhost:4001/api-docs>
+
+> ℹ️ Scalar loads its render bundle from a CDN, so `/reference` needs internet
+> access at runtime. Swagger UI is fully self-hosted and works offline.
 
 ## Environment variables
 
