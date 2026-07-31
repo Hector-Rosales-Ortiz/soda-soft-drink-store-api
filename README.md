@@ -26,7 +26,7 @@ soda-soft-drink-store-api/
 ├── services/      # Business logic (uses the ORM models)
 ├── config.js      # Env-driven settings
 ├── index.js       # App entry point
-├── setupDatabase.js  # Syncs tables (sequelize.sync) + seeds products
+├── setupDatabase.js  # Ensures DB exists, then runs Sequelize migrations
 └── swagger.yml    # OpenAPI spec (shared by both docs UIs)
 ```
 
@@ -50,10 +50,8 @@ cp example.env .env        # (Windows: copy example.env .env)
 # 3. Create the database (once), e.g. via psql:
 #    CREATE DATABASE soda_store;
 
-# 4. Create tables (from the Sequelize models) and seed sample sodas
+# 4. Create tables from migrations
 npm run setup-db
-#   Reset everything:   node setupDatabase.js --force
-#   Migrate in place:   node setupDatabase.js --alter
 
 # 5. Start the API
 npm start          # or: npm run dev  (auto-reload with nodemon)

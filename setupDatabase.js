@@ -1,6 +1,8 @@
 'use strict';
 
 const { Pool } = require('pg');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
 require('dotenv').config();
 const config = require('./config');
 
@@ -32,99 +34,49 @@ async function ensureDatabase() {
   }
 }
 
-const createTables = async () => {
-  const db = require('./db/index.js');
+function createDatabaseUrl() {
+  const databaseUrl = new URL('postgres://localhost');
+  databaseUrl.hostname = dbConfig.host;
+  databaseUrl.port = String(dbConfig.port);
+  databaseUrl.pathname = `/${targetDatabase}`;
+  databaseUrl.username = dbConfig.user;
+  databaseUrl.password = dbConfig.password;
 
-  console.log('🔄 Creating database tables...');
+  return databaseUrl.toString();
+}
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      email VARCHAR(255) UNIQUE NOT NULL,
-      name VARCHAR(255) NOT NULL,
-      password_hash VARCHAR(255) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
+function runMigrations() {
+  const sequelizeCliEntry = require.resolve('sequelize-cli/lib/sequelize');
+  const migrationsPath = path.resolve(__dirname, 'db', 'migrations');
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS products (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(150) NOT NULL,
-      description TEXT,
-      price DECIMAL(10,2) NOT NULL,
-      stock INTEGER NOT NULL DEFAULT 0,
-      flavor VARCHAR(100),
-      size VARCHAR(50),
-      image_url TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
+  console.log('🔄 Running database migrations...');
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS carts (
-      id SERIAL PRIMARY KEY,
-      user_id INT UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
+  const result = spawnSync(
+    process.execPath,
+    [sequelizeCliEntry, 'db:migrate', '--url', createDatabaseUrl(), '--migrations-path', migrationsPath],
+    {
+      cwd: __dirname,
+      env: { ...process.env, NODE_ENV: process.env.NODE_ENV || 'development' },
+      stdio: 'inherit',
+    }
+  );
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS cart_items (
-      id SERIAL PRIMARY KEY,
-      cart_id INT NOT NULL REFERENCES carts(id) ON DELETE CASCADE,
-      product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-      quantity INT NOT NULL DEFAULT 1,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(cart_id, product_id)
-    );
-  `);
+  if (result.status !== 0) {
+    throw new Error('Migration command failed');
+  }
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS orders (
-      id SERIAL PRIMARY KEY,
-      user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      total DECIMAL(10,2) NOT NULL,
-      status VARCHAR(50) NOT NULL DEFAULT 'pending',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS order_items (
-      id SERIAL PRIMARY KEY,
-      order_id INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-      product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-      quantity INT NOT NULL,
-      price DECIMAL(10,2) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  console.log('✅ All tables created successfully!');
-};
+  console.log('✅ Migrations completed successfully!');
+}
 
 async function main() {
-  let db;
   let exitCode = 0;
 
   try {
     await ensureDatabase();
-    db = require('./db/index.js');
-    await createTables();
+    runMigrations();
   } catch (err) {
-    console.error('❌ Error creating database or tables:', err);
+    console.error('❌ Error creating database or running migrations:', err);
     exitCode = 1;
-  } finally {
-    if (db && db.pool) {
-      await db.pool.end().catch((err) => console.error('Pool cleanup error:', err));
-    }
   }
 
   process.exit(exitCode);

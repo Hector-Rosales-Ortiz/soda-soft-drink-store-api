@@ -37,7 +37,7 @@ async function dropDatabase(databaseName) {
   }
 }
 
-test('setupDatabase.js creates the expected PostgreSQL tables', async () => {
+test('setupDatabase.js creates the expected PostgreSQL tables via migrations', async () => {
   const databaseName = createTestDatabaseName();
   const env = {
     ...process.env,
@@ -67,8 +67,18 @@ test('setupDatabase.js creates the expected PostgreSQL tables', async () => {
 
     assert.deepEqual(
       rows.map((row) => row.table_name),
-      ['cart_items', 'carts', 'order_items', 'orders', 'products', 'users']
+      ['SequelizeMeta', 'cart_items', 'carts', 'order_items', 'orders', 'products', 'users']
     );
+
+    const { rows: productNameColumnRows } = await pool.query(
+      `SELECT character_maximum_length
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'products'
+         AND column_name = 'name'`
+    );
+
+    assert.equal(productNameColumnRows[0].character_maximum_length, 255);
   } finally {
     await pool.end();
     await dropDatabase(databaseName);
