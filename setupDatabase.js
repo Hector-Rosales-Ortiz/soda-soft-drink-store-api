@@ -53,8 +53,8 @@ const createTables = async () => {
       id SERIAL PRIMARY KEY,
       name VARCHAR(150) NOT NULL,
       description TEXT,
-      price DECIMAL(10,2) NOT NULL,
-      stock INTEGER NOT NULL DEFAULT 0,
+      price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
+      stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
       flavor VARCHAR(100),
       size VARCHAR(50),
       image_url TEXT,
@@ -77,7 +77,7 @@ const createTables = async () => {
       id SERIAL PRIMARY KEY,
       cart_id INT NOT NULL REFERENCES carts(id) ON DELETE CASCADE,
       product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-      quantity INT NOT NULL DEFAULT 1,
+      quantity INT NOT NULL DEFAULT 1 CHECK (quantity >= 1),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(cart_id, product_id)
@@ -88,8 +88,9 @@ const createTables = async () => {
     CREATE TABLE IF NOT EXISTS orders (
       id SERIAL PRIMARY KEY,
       user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      total DECIMAL(10,2) NOT NULL,
-      status VARCHAR(50) NOT NULL DEFAULT 'pending',
+      total DECIMAL(10,2) NOT NULL CHECK (total >= 0),
+      status VARCHAR(50) NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled')),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -100,8 +101,8 @@ const createTables = async () => {
       id SERIAL PRIMARY KEY,
       order_id INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
       product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-      quantity INT NOT NULL,
-      price DECIMAL(10,2) NOT NULL,
+      quantity INT NOT NULL CHECK (quantity >= 1),
+      price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );

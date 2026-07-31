@@ -1,6 +1,6 @@
 'use strict';
 
-const { models } = require('../db');
+const { sequelize, models } = require('../db');
 const { httpError } = require('./AuthService');
 
 const { Cart, CartItem, Product } = models;
@@ -53,25 +53,36 @@ async function addItem(userId, { productId, quantity = 1 }) {
     throw httpError(400, 'quantity must be a positive integer');
   }
 
-  const product = await Product.findByPk(productId);
-  if (!product) throw httpError(404, 'Product not found');
-
+  // Resolve (or lazily create) the cart outside the transaction so the
+  // INSERT on `carts` doesn't hold a lock longer than necessary.
   const cart = await getOrCreateCart(userId);
 
-  const [item, created] = await CartItem.findOrCreate({
-    where: { cartId: cart.id, productId },
-    defaults: { quantity: qty },
+  // Wrap the stock-check + cart-item upsert in a transaction with a
+  // row-level lock on the product.  This prevents two concurrent addItem
+  // calls from both passing the stock check and together overselling stock.
+  return sequelize.transaction(async (t) => {
+    const product = await Product.findByPk(productId, {
+      lock: t.LOCK.UPDATE,
+      transaction: t,
+    });
+    if (!product) throw httpError(404, 'Product not found');
+
+    const [item, created] = await CartItem.findOrCreate({
+      where: { cartId: cart.id, productId },
+      defaults: { quantity: qty },
+      transaction: t,
+    });
+
+    const newQty = created ? qty : item.quantity + qty;
+    if (product.stock < newQty) throw httpError(409, 'Not enough stock available');
+
+    if (!created) {
+      item.quantity = newQty;
+      await item.save({ transaction: t });
+    }
+
+    return getCart(userId);
   });
-
-  const newQty = created ? qty : item.quantity + qty;
-  if (product.stock < newQty) throw httpError(409, 'Not enough stock available');
-
-  if (!created) {
-    item.quantity = newQty;
-    await item.save();
-  }
-
-  return getCart(userId);
 }
 
 async function updateItem(userId, productId, quantity) {

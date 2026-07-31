@@ -309,6 +309,7 @@ test('cart service queries and mutates cart lines correctly', async () => {
   });
   const { getCart, addItem, updateItem, removeItem, clear } = loadService('../services/CartService', {
     models: store.models,
+    sequelize: store.sequelize,
   });
 
   assert.deepEqual(await getCart(1), { id: 1, items: [], total: 0 });
@@ -326,6 +327,37 @@ test('cart service queries and mutates cart lines correctly', async () => {
   await addItem(1, { productId: product.id, quantity: 2 });
   const afterClear = await clear(1);
   assert.equal(afterClear.items.length, 0);
+});
+
+test('cart service addItem rejects when requested quantity exceeds stock', async () => {
+  const store = createStore();
+  const product = store.seedProduct({
+    name: 'Limited Edition Lime',
+    description: 'Rare lime soda',
+    price: 4.0,
+    stock: 2,
+    flavor: 'lime',
+    size: '500ml',
+  });
+  const { addItem } = loadService('../services/CartService', {
+    models: store.models,
+    sequelize: store.sequelize,
+  });
+
+  // Requesting more than available stock must raise a 409 error.
+  await assert.rejects(
+    () => addItem(1, { productId: product.id, quantity: 5 }),
+    (err) => {
+      assert.equal(err.status, 409);
+      assert.match(err.message, /not enough stock/i);
+      return true;
+    }
+  );
+
+  // Adding exactly the available stock for a different user (fresh cart,
+  // no stale item from the rolled-back call above) should succeed.
+  const result = await addItem(2, { productId: product.id, quantity: 2 });
+  assert.equal(result.items[0].quantity, 2);
 });
 
 test('order service checks out and fetches orders', async () => {
