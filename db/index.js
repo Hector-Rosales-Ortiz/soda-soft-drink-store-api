@@ -24,7 +24,6 @@ pool.connect((err, client, done) => {
   done();
 });
 
-
 const sequelizePkg = require('sequelize');
 const Sequelize = sequelizePkg.Sequelize;
 const DataTypes = sequelizePkg.DataTypes;
@@ -33,7 +32,8 @@ const sequelizeDatabase = process.env.DB_NAME || process.env.PGDATABASE || confi
 const sequelizeUser = process.env.DB_USER || process.env.PGUSER || config.db.user;
 const sequelizePassword = process.env.DB_PASSWORD || process.env.PGPASSWORD || config.db.password;
 const sequelizeHost = process.env.DB_HOST || process.env.PGHOST || config.db.host;
-const sequelizePort = parseInt(process.env.DB_PORT || process.env.PGPORT || config.db.port, 10) || 5432;
+const sequelizePort =
+  parseInt(process.env.DB_PORT || process.env.PGPORT || config.db.port, 10) || 5432;
 
 const sequelize = new Sequelize(sequelizeDatabase, sequelizeUser, sequelizePassword, {
   host: sequelizeHost,
@@ -67,7 +67,6 @@ OrderItem.belongsTo(Product, { foreignKey: 'productId' });
 Product.hasMany(OrderItem, { foreignKey: 'productId' });
 
 const models = { User, Product, Cart, CartItem, Order, OrderItem };
-
 
 /**
  * Validate database credentials/connectivity at startup.

@@ -19,7 +19,9 @@ async function ensureDatabase() {
   });
 
   try {
-    const existsResult = await adminPool.query('SELECT 1 FROM pg_database WHERE datname = $1', [targetDatabase]);
+    const existsResult = await adminPool.query('SELECT 1 FROM pg_database WHERE datname = $1', [
+      targetDatabase,
+    ]);
 
     if (existsResult.rowCount === 0) {
       await adminPool.query(`CREATE DATABASE "${targetDatabase.replace(/"/g, '""')}"`);

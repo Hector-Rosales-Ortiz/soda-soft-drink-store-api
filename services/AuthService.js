@@ -74,11 +74,9 @@ async function login({ email, password }) {
 }
 
 function signToken(user) {
-  return jwt.sign(
-    { sub: user.id, email: user.email },
-    config.jwt.secret,
-    { expiresIn: config.jwt.expiresIn }
-  );
+  return jwt.sign({ sub: user.id, email: user.email }, config.jwt.secret, {
+    expiresIn: config.jwt.expiresIn,
+  });
 }
 
 module.exports = {

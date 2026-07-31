@@ -31,9 +31,7 @@ router.post('/items', async (req, res, next) => {
 /** PUT /api/cart/items/:productId — set a line's quantity (0 removes it). */
 router.put('/items/:productId', async (req, res, next) => {
   try {
-    res.json(
-      await CartService.updateItem(req.user.id, req.params.productId, req.body.quantity)
-    );
+    res.json(await CartService.updateItem(req.user.id, req.params.productId, req.body.quantity));
   } catch (err) {
     next(err);
   }

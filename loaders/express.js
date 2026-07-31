@@ -29,7 +29,6 @@ module.exports = (app) => {
   });
 
   // Central error handler — services throw errors carrying a `.status`.
-  // eslint-disable-next-line no-unused-vars
   app.use((err, _req, res, _next) => {
     const status = err.status || 500;
     if (status >= 500) console.error(err);

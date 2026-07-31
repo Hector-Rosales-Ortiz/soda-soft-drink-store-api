@@ -50,7 +50,11 @@ test('setupDatabase.js creates the expected PostgreSQL tables', async () => {
     encoding: 'utf8',
   });
 
-  assert.equal(result.status, 0, `setupDatabase.js failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  assert.equal(
+    result.status,
+    0,
+    `setupDatabase.js failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
 
   const pool = new Pool({
     ...adminConfig,
