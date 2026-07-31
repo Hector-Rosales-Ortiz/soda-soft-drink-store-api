@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
+    "lint": "eslint .",
     "setup-db": "node setupDatabase.js",
     "test": "node --test"
   },
@@ -33,6 +34,7 @@
     "yamljs": "^0.3.0"
   },
   "devDependencies": {
+    "eslint": "^8.57.1",
     "nodemon": "^3.1.4"
   }
 }
