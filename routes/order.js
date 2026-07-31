@@ -4,6 +4,7 @@ const express = require('express');
 const passport = require('passport');
 
 const OrderService = require('../services/OrderService');
+const requireAdmin = require('../middleware/requireAdmin');
 
 const router = express.Router();
 
@@ -31,6 +32,15 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     res.json(await OrderService.getOrder(req.user.id, req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** PATCH /api/orders/:id/status — update order status (admin only). */
+router.patch('/:id/status', requireAdmin, async (req, res, next) => {
+  try {
+    res.json(await OrderService.updateOrderStatus(req.params.id, req.body.status));
   } catch (err) {
     next(err);
   }

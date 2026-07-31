@@ -253,6 +253,7 @@ function createStore() {
     findOne: async ({ where }) =>
       state.orders.find((order) => order.id === Number(where.id) && order.userId === where.userId) ||
       null,
+    findByPk: async (id) => state.orders.find((order) => order.id === Number(id)) || null,
   };
 
   const OrderItem = {
@@ -377,4 +378,157 @@ test('user service reads and updates profile data', async () => {
   const updated = await updateProfile(user.id, { name: 'Updated Name', email: 'updated@example.com' });
   assert.equal(updated.name, 'Updated Name');
   assert.equal(updated.email, 'updated@example.com');
+});
+
+test('order service updateOrderStatus follows the state machine', async () => {
+  const store = createStore();
+  const product = store.seedProduct({
+    name: 'Cherry Soda',
+    description: 'Cherry flavoured soda',
+    price: 2,
+    stock: 10,
+    flavor: 'cherry',
+    size: '330ml',
+  });
+  await store.models.CartItem.findOrCreate({
+    where: { cartId: 1, productId: product.id },
+    defaults: { quantity: 1 },
+  });
+
+  const { createOrderFromCart, updateOrderStatus } = loadService('../services/OrderService', {
+    models: store.models,
+    sequelize: store.sequelize,
+  });
+
+  const order = await createOrderFromCart(1);
+  assert.equal(order.status, 'pending');
+
+  // Allowed transition: pending → paid
+  const paid = await updateOrderStatus(order.id, 'paid');
+  assert.equal(paid.status, 'paid');
+
+  // Allowed transition: paid → shipped
+  const shipped = await updateOrderStatus(order.id, 'shipped');
+  assert.equal(shipped.status, 'shipped');
+
+  // Allowed transition: shipped → delivered
+  const delivered = await updateOrderStatus(order.id, 'delivered');
+  assert.equal(delivered.status, 'delivered');
+
+  // Illegal: delivered is terminal — any further transition must be rejected
+  await assert.rejects(
+    () => updateOrderStatus(order.id, 'cancelled'),
+    (err) => {
+      assert.equal(err.status, 409);
+      return true;
+    }
+  );
+});
+
+test('order service updateOrderStatus allows cancellation from pending and paid', async () => {
+  const store = createStore();
+  const product = store.seedProduct({
+    name: 'Lemon Soda',
+    description: 'Lemon flavoured soda',
+    price: 1.5,
+    stock: 10,
+    flavor: 'lemon',
+    size: '330ml',
+  });
+
+  const { createOrderFromCart, updateOrderStatus } = loadService('../services/OrderService', {
+    models: store.models,
+    sequelize: store.sequelize,
+  });
+
+  // First order: cancel directly from pending
+  await store.models.CartItem.findOrCreate({
+    where: { cartId: 1, productId: product.id },
+    defaults: { quantity: 1 },
+  });
+  const order1 = await createOrderFromCart(1);
+  const cancelled1 = await updateOrderStatus(order1.id, 'cancelled');
+  assert.equal(cancelled1.status, 'cancelled');
+
+  // Second order: advance to paid, then cancel
+  await store.models.CartItem.findOrCreate({
+    where: { cartId: 1, productId: product.id },
+    defaults: { quantity: 1 },
+  });
+  const order2 = await createOrderFromCart(1);
+  await updateOrderStatus(order2.id, 'paid');
+  const cancelled2 = await updateOrderStatus(order2.id, 'cancelled');
+  assert.equal(cancelled2.status, 'cancelled');
+});
+
+test('order service updateOrderStatus rejects illegal transitions with 409', async () => {
+  const store = createStore();
+  const product = store.seedProduct({
+    name: 'Orange Soda',
+    description: 'Orange flavoured soda',
+    price: 2,
+    stock: 10,
+    flavor: 'orange',
+    size: '330ml',
+  });
+  await store.models.CartItem.findOrCreate({
+    where: { cartId: 1, productId: product.id },
+    defaults: { quantity: 1 },
+  });
+
+  const { createOrderFromCart, updateOrderStatus } = loadService('../services/OrderService', {
+    models: store.models,
+    sequelize: store.sequelize,
+  });
+
+  const order = await createOrderFromCart(1);
+
+  // pending → shipped is not allowed (must go via paid)
+  await assert.rejects(
+    () => updateOrderStatus(order.id, 'shipped'),
+    (err) => {
+      assert.equal(err.status, 409);
+      return true;
+    }
+  );
+
+  // pending → delivered is not allowed
+  await assert.rejects(
+    () => updateOrderStatus(order.id, 'delivered'),
+    (err) => {
+      assert.equal(err.status, 409);
+      return true;
+    }
+  );
+});
+
+test('order service updateOrderStatus rejects unknown status with 400', async () => {
+  const store = createStore();
+  const product = store.seedProduct({
+    name: 'Grape Fizz',
+    description: 'Grape fizzy drink',
+    price: 1,
+    stock: 5,
+    flavor: 'grape',
+    size: '500ml',
+  });
+  await store.models.CartItem.findOrCreate({
+    where: { cartId: 1, productId: product.id },
+    defaults: { quantity: 1 },
+  });
+
+  const { createOrderFromCart, updateOrderStatus } = loadService('../services/OrderService', {
+    models: store.models,
+    sequelize: store.sequelize,
+  });
+
+  const order = await createOrderFromCart(1);
+
+  await assert.rejects(
+    () => updateOrderStatus(order.id, 'invalid-status'),
+    (err) => {
+      assert.equal(err.status, 400);
+      return true;
+    }
+  );
 });
