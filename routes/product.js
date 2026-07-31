@@ -1,12 +1,11 @@
 'use strict';
 
 const express = require('express');
-const passport = require('passport');
 
 const ProductService = require('../services/ProductService');
+const requireAdmin = require('../middleware/requireAdmin');
 
 const router = express.Router();
-const requireAuth = passport.authenticate('jwt', { session: false });
 
 /** GET /api/products — list / search soda drinks (public). */
 router.get('/', async (req, res, next) => {
@@ -26,8 +25,8 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-/** POST /api/products — create a product (protected/admin). */
-router.post('/', requireAuth, async (req, res, next) => {
+/** POST /api/products — create a product (admin only). */
+router.post('/', requireAdmin, async (req, res, next) => {
   try {
     res.status(201).json(await ProductService.create(req.body));
   } catch (err) {
@@ -35,8 +34,8 @@ router.post('/', requireAuth, async (req, res, next) => {
   }
 });
 
-/** PUT /api/products/:id — update a product (protected/admin). */
-router.put('/:id', requireAuth, async (req, res, next) => {
+/** PUT /api/products/:id — update a product (admin only). */
+router.put('/:id', requireAdmin, async (req, res, next) => {
   try {
     res.json(await ProductService.update(req.params.id, req.body));
   } catch (err) {
@@ -44,8 +43,8 @@ router.put('/:id', requireAuth, async (req, res, next) => {
   }
 });
 
-/** DELETE /api/products/:id — remove a product (protected/admin). */
-router.delete('/:id', requireAuth, async (req, res, next) => {
+/** DELETE /api/products/:id — remove a product (admin only). */
+router.delete('/:id', requireAdmin, async (req, res, next) => {
   try {
     await ProductService.remove(req.params.id);
     res.status(204).send();
