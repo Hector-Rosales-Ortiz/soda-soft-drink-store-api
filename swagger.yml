@@ -105,6 +105,12 @@ components:
       type: object
       properties:
         error: { type: string }
+    RateLimitError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Too many requests, please try again later.
 
 paths:
   /auth/register:
@@ -127,6 +133,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: Too many requests — rate limit exceeded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RateLimitError' }
 
   /auth/login:
     post:
@@ -148,6 +159,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: Too many requests — rate limit exceeded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RateLimitError' }
 
   /products:
     get:
