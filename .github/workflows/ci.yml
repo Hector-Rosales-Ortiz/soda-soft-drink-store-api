@@ -1,12 +1,16 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     services:
       postgres:
@@ -45,4 +49,4 @@ jobs:
           DB_HOST: localhost
           DB_PASSWORD: postgres
           DB_PORT: 5432
-          JWT_SECRET: ci_test_secret
+          JWT_SECRET: ci_test_secret_not_for_production
