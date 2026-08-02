@@ -11,6 +11,17 @@ const { Cart, CartItem, Product, Order, OrderItem } = models;
  * created with a partially decremented stock or a half-emptied cart.
  */
 
+/** Valid status values and their permitted next states. */
+const TRANSITIONS = {
+  pending: ['paid', 'cancelled'],
+  paid: ['shipped', 'cancelled'],
+  shipped: ['delivered', 'cancelled'],
+  delivered: [],
+  cancelled: [],
+};
+
+const VALID_STATUSES = new Set(Object.keys(TRANSITIONS));
+
 function orderItemDTO(item) {
   const product = item.Product;
   const price = Number(item.price);
@@ -111,8 +122,31 @@ async function getOrder(userId, orderId) {
   return orderDTO(order, items);
 }
 
+/**
+ * Update an order's status, enforcing the legal state machine.
+ * Admin only — route guard handled at the router level.
+ */
+async function updateOrderStatus(orderId, newStatus) {
+  if (!newStatus || !VALID_STATUSES.has(newStatus)) {
+    throw httpError(400, `"${newStatus}" is not a valid order status`);
+  }
+
+  const order = await Order.findByPk(orderId);
+  if (!order) throw httpError(404, 'Order not found');
+
+  const allowed = TRANSITIONS[order.status];
+  if (!allowed.includes(newStatus)) {
+    throw httpError(409, `Cannot transition order from "${order.status}" to "${newStatus}"`);
+  }
+
+  order.status = newStatus;
+  await order.save();
+  return orderDTO(order);
+}
+
 module.exports = {
   createOrderFromCart,
   listOrders,
   getOrder,
+  updateOrderStatus,
 };
