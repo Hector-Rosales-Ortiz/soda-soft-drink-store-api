@@ -40,10 +40,21 @@ const config = {
 
   db: {
     host: (dbFromUrl && dbFromUrl.host) || process.env.DB_HOST || process.env.PGHOST || 'localhost',
-    port: (dbFromUrl && dbFromUrl.port) || parseInt(process.env.DB_PORT || process.env.PGPORT, 10) || 5432,
-    database: (dbFromUrl && dbFromUrl.database) || process.env.DB_NAME || process.env.PGDATABASE || 'soda_store',
+    port:
+      (dbFromUrl && dbFromUrl.port) ||
+      parseInt(process.env.DB_PORT || process.env.PGPORT, 10) ||
+      5432,
+    database:
+      (dbFromUrl && dbFromUrl.database) ||
+      process.env.DB_NAME ||
+      process.env.PGDATABASE ||
+      'soda_store',
     user: (dbFromUrl && dbFromUrl.user) || process.env.DB_USER || process.env.PGUSER || 'postgres',
-    password: (dbFromUrl && dbFromUrl.password) || process.env.DB_PASSWORD || process.env.PGPASSWORD || 'postgres',
+    password:
+      (dbFromUrl && dbFromUrl.password) ||
+      process.env.DB_PASSWORD ||
+      process.env.PGPASSWORD ||
+      'postgres',
   },
 
   jwt: {
