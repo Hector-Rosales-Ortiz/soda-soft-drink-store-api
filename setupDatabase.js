@@ -3,6 +3,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { Pool } = require('pg');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
 require('dotenv').config();
 const config = require('./config');
 
@@ -98,7 +100,7 @@ async function main() {
     await runMigrations(pool);
     console.log('✅ All migrations completed successfully!');
   } catch (err) {
-    console.error('❌ Error creating database or tables:', err);
+    console.error('❌ Error creating database or running migrations:', err);
     exitCode = 1;
   } finally {
     if (pool) {
