@@ -26,7 +26,8 @@ soda-soft-drink-store-api/
 ├── services/      # Business logic (uses the ORM models)
 ├── config.js      # Env-driven settings
 ├── index.js       # App entry point
-├── setupDatabase.js  # Syncs tables (sequelize.sync) + seeds products
+├── seed.js        # Inserts fixed product fixtures + a demo user
+├── setupDatabase.js  # Creates the database and tables
 └── swagger.yml    # OpenAPI spec (shared by both docs UIs)
 ```
 
@@ -56,9 +57,22 @@ cp example.env .env        # (Windows: copy example.env .env)
 npm run setup-db
 #   Reset everything:   node setupDatabase.js --force
 
-# 5. Start the API
+# 5. Seed the database with 15 fixed soda products and a demo user
+npm run seed
+#   Re-load fixtures from scratch:  node seed.js --reset
+
+# 6. Start the API
 npm start          # or: npm run dev  (auto-reload with nodemon)
 ```
+
+> **Seed notes**
+> - Running `npm run seed` more than once is safe: it skips products when
+>   the table is already populated and uses `ON CONFLICT DO NOTHING` for the
+>   demo user.
+> - Pass `--reset` (`node seed.js --reset`) to truncate the products table and
+>   reload all fixtures from scratch (cascades to `cart_items` and
+>   `order_items`).
+> - Demo credentials: **email** `demo@sodastore.example` / **password** `DemoPass123!`
 
 ## Testing
 

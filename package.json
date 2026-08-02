@@ -10,6 +10,7 @@
     "repair-install": "node scripts/repair-install.js",
     "pretest": "node scripts/repair-install.js",
     "setup-db": "node setupDatabase.js",
+    "seed": "node seed.js",
     "test": "node --test"
   },
   "keywords": [
