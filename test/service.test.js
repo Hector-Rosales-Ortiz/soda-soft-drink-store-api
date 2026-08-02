@@ -97,6 +97,7 @@ function createStore() {
       email: data.email,
       name: data.name,
       passwordHash: data.passwordHash,
+      role: data.role || 'customer',
       createdAt,
       save: async function save() {
         return this;
