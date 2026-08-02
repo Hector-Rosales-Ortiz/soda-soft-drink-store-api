@@ -22,7 +22,15 @@ module.exports = (passport) => {
     new JwtStrategy(options, async (payload, done) => {
       try {
         const user = await User.findByPk(payload.sub);
-        return user ? done(null, user) : done(null, false);
+        if (!user) {
+          return done(null, false);
+        }
+
+        if (payload.role && user.role !== payload.role) {
+          return done(null, false);
+        }
+
+        return done(null, user);
       } catch (err) {
         return done(err, false);
       }
