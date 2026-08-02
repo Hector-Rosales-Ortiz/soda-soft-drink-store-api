@@ -37,8 +37,7 @@ async function dropDatabase(databaseName) {
   }
 }
 
-/** Spin up a fresh test database and return the pool + cleanup function. */
-async function createTestDatabase() {
+test('setupDatabase.js creates the expected PostgreSQL tables via migrations', async () => {
   const databaseName = createTestDatabaseName();
   const env = { ...process.env, DB_NAME: databaseName };
 
@@ -75,8 +74,22 @@ test('setupDatabase.js creates the expected PostgreSQL tables', async () => {
 
     assert.deepEqual(
       rows.map((row) => row.table_name),
-      ['cart_items', 'carts', 'order_items', 'orders', 'products', 'users']
+      ['cart_items', 'carts', 'migrations', 'order_items', 'orders', 'products', 'users']
     );
+
+    const { rows: migrationRows } = await pool.query(
+      `SELECT table_name
+       FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = 'migrations'`
+    );
+    assert.equal(migrationRows.length, 1);
+
+    const { rows: productColumnRows } = await pool.query(
+      `SELECT character_maximum_length
+       FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'name'`
+    );
+    assert.equal(productColumnRows[0].character_maximum_length, 150);
   } finally {
     await cleanup();
   }
