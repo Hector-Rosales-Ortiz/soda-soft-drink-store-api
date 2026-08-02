@@ -215,7 +215,10 @@ function createStore() {
     findAll: async ({ where }) =>
       state.cartItems
         .filter((item) => item.cartId === where.cartId)
-        .map((item) => ({ ...item, Product: state.products.find((product) => product.id === item.productId) })),
+        .map((item) => ({
+          ...item,
+          Product: state.products.find((product) => product.id === item.productId),
+        })),
     findOrCreate: async ({ where, defaults }) => {
       let item = state.cartItems.find(
         (current) => current.cartId === where.cartId && current.productId === where.productId
@@ -252,8 +255,9 @@ function createStore() {
         .filter((order) => order.userId === where.userId)
         .sort((left, right) => right.createdAt - left.createdAt),
     findOne: async ({ where }) =>
-      state.orders.find((order) => order.id === Number(where.id) && order.userId === where.userId) ||
-      null,
+      state.orders.find(
+        (order) => order.id === Number(where.id) && order.userId === where.userId
+      ) || null,
   };
 
   const OrderItem = {
@@ -261,7 +265,10 @@ function createStore() {
     findAll: async ({ where }) =>
       state.orderItems
         .filter((item) => item.orderId === where.orderId)
-        .map((item) => ({ ...item, Product: state.products.find((product) => product.id === item.productId) })),
+        .map((item) => ({
+          ...item,
+          Product: state.products.find((product) => product.id === item.productId),
+        })),
   };
 
   const sequelize = {
@@ -308,10 +315,12 @@ test('cart service queries and mutates cart lines correctly', async () => {
     flavor: 'cola',
     size: '330ml',
   });
-  const { getCart, addItem, updateItem, removeItem, clear } = loadService('../services/CartService', {
-    models: store.models,
-    sequelize: store.sequelize,
-  });
+  const { getCart, addItem, updateItem, removeItem, clear } = loadService(
+    '../services/CartService',
+    {
+      models: store.models,
+    }
+  );
 
   assert.deepEqual(await getCart(1), { id: 1, items: [], total: 0 });
 
@@ -407,7 +416,10 @@ test('user service reads and updates profile data', async () => {
 
   assert.equal((await getProfile(user.id)).name, 'Original Name');
 
-  const updated = await updateProfile(user.id, { name: 'Updated Name', email: 'updated@example.com' });
+  const updated = await updateProfile(user.id, {
+    name: 'Updated Name',
+    email: 'updated@example.com',
+  });
   assert.equal(updated.name, 'Updated Name');
   assert.equal(updated.email, 'updated@example.com');
 });
