@@ -3,6 +3,7 @@
 const express = require('express');
 const passport = require('passport');
 
+const requireAdmin = require('../middleware/requireAdmin');
 const ProductService = require('../services/ProductService');
 
 const router = express.Router();
@@ -27,7 +28,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 /** POST /api/products — create a product (protected/admin). */
-router.post('/', requireAuth, async (req, res, next) => {
+router.post('/', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     res.status(201).json(await ProductService.create(req.body));
   } catch (err) {
@@ -36,7 +37,7 @@ router.post('/', requireAuth, async (req, res, next) => {
 });
 
 /** PUT /api/products/:id — update a product (protected/admin). */
-router.put('/:id', requireAuth, async (req, res, next) => {
+router.put('/:id', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     res.json(await ProductService.update(req.params.id, req.body));
   } catch (err) {
@@ -45,7 +46,7 @@ router.put('/:id', requireAuth, async (req, res, next) => {
 });
 
 /** DELETE /api/products/:id — remove a product (protected/admin). */
-router.delete('/:id', requireAuth, async (req, res, next) => {
+router.delete('/:id', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     await ProductService.remove(req.params.id);
     res.status(204).send();

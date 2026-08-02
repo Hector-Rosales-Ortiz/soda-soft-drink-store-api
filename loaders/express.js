@@ -2,6 +2,7 @@
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const passport = require('passport');
 
 const config = require('../config');
@@ -12,6 +13,7 @@ const routes = require('../routes');
  * central 404 / error handlers. Called by loaders/index.js.
  */
 module.exports = (app) => {
+  app.use(helmet());
   app.use(cors({ origin: config.cors.origin }));
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));

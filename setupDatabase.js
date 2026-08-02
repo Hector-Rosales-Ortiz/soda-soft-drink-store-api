@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('node:fs');
+const path = require('node:path');
 const { Pool } = require('pg');
 require('dotenv').config();
 const config = require('./config');
@@ -32,98 +34,75 @@ async function ensureDatabase() {
   }
 }
 
-const createTables = async () => {
-  const db = require('./db/index.js');
+async function getTargetPool() {
+  return new Pool({
+    ...dbConfig,
+    database: targetDatabase,
+  });
+}
 
-  console.log('🔄 Creating database tables...');
+async function resetSchema(pool) {
+  await pool.query('DROP TABLE IF EXISTS migrations');
+  await pool.query('DROP TABLE IF EXISTS order_items');
+  await pool.query('DROP TABLE IF EXISTS orders');
+  await pool.query('DROP TABLE IF EXISTS cart_items');
+  await pool.query('DROP TABLE IF EXISTS carts');
+  await pool.query('DROP TABLE IF EXISTS products');
+  await pool.query('DROP TABLE IF EXISTS users');
+}
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS users (
+async function runMigrations(pool) {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS migrations (
       id SERIAL PRIMARY KEY,
-      email VARCHAR(255) UNIQUE NOT NULL,
-      name VARCHAR(255) NOT NULL,
-      password_hash VARCHAR(255) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      name VARCHAR(255) UNIQUE NOT NULL,
+      executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS products (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(150) NOT NULL,
-      description TEXT,
-      price DECIMAL(10,2) NOT NULL,
-      stock INTEGER NOT NULL DEFAULT 0,
-      flavor VARCHAR(100),
-      size VARCHAR(50),
-      image_url TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
+  const migrationsDir = path.join(__dirname, 'migrations');
+  const migrationFiles = fs
+    .readdirSync(migrationsDir)
+    .filter((fileName) => fileName.endsWith('.js'))
+    .sort();
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS carts (
-      id SERIAL PRIMARY KEY,
-      user_id INT UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
+  for (const fileName of migrationFiles) {
+    const migration = require(path.join(migrationsDir, fileName));
+    const applied = await pool.query('SELECT 1 FROM migrations WHERE name = $1', [migration.name || fileName]);
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS cart_items (
-      id SERIAL PRIMARY KEY,
-      cart_id INT NOT NULL REFERENCES carts(id) ON DELETE CASCADE,
-      product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-      quantity INT NOT NULL DEFAULT 1,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(cart_id, product_id)
-    );
-  `);
+    if (applied.rowCount > 0) {
+      continue;
+    }
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS orders (
-      id SERIAL PRIMARY KEY,
-      user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      total DECIMAL(10,2) NOT NULL,
-      status VARCHAR(50) NOT NULL DEFAULT 'pending',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS order_items (
-      id SERIAL PRIMARY KEY,
-      order_id INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-      product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-      quantity INT NOT NULL,
-      price DECIMAL(10,2) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  console.log('✅ All tables created successfully!');
-};
+    console.log(`🔄 Running migration ${fileName}...`);
+    await migration.up(pool);
+    await pool.query('INSERT INTO migrations (name) VALUES ($1)', [migration.name || fileName]);
+    console.log(`✅ Applied migration ${fileName}`);
+  }
+}
 
 async function main() {
-  let db;
+  let pool;
   let exitCode = 0;
 
   try {
     await ensureDatabase();
-    db = require('./db/index.js');
-    await createTables();
+    pool = await getTargetPool();
+
+    if (process.argv.includes('--force')) {
+      console.log('🔄 Resetting schema...');
+      await resetSchema(pool);
+    }
+
+    console.log('🔄 Running migrations...');
+    await runMigrations(pool);
+    console.log('✅ All migrations completed successfully!');
   } catch (err) {
     console.error('❌ Error creating database or tables:', err);
     exitCode = 1;
   } finally {
-    if (db && db.pool) {
-      await db.pool.end().catch((err) => console.error('Pool cleanup error:', err));
+    if (pool) {
+      await pool.end().catch((err) => console.error('Pool cleanup error:', err));
     }
   }
 

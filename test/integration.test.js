@@ -39,6 +39,25 @@ const { Pool } = require('pg');
 
 const repoRoot = path.resolve(__dirname, '..');
 const setupScript = path.join(repoRoot, 'setupDatabase.js');
+const modulePathsToReset = [
+  '../config',
+  '../db',
+  '../routes',
+  '../routes/auth',
+  '../routes/product',
+  '../routes/cart',
+  '../routes/order',
+  '../routes/user',
+  '../loaders',
+  '../loaders/express',
+  '../loaders/passport',
+  '../loaders/swagger',
+  '../services/AuthService',
+  '../services/ProductService',
+  '../services/CartService',
+  '../services/OrderService',
+  '../services/UserService',
+];
 
 /** Connection options for the PostgreSQL admin user (connects to `postgres`). */
 const pgAdmin = {
@@ -108,6 +127,19 @@ function runSetupDatabase() {
   }
 }
 
+function loadFreshApp() {
+  for (const modulePath of modulePathsToReset) {
+    delete require.cache[require.resolve(modulePath)];
+  }
+
+  const express = require('express');
+  const loaders = require('../loaders');
+  const app = express();
+
+  loaders(app);
+  return app;
+}
+
 /** Insert one soda product directly and return its id. */
 async function seedProduct(pool) {
   const { rows } = await pool.query(
@@ -116,6 +148,13 @@ async function seedProduct(pool) {
      RETURNING id`
   );
   return rows[0].id;
+}
+
+async function promoteUserToAdmin(pool, email) {
+  await pool.query(
+    `UPDATE users SET role = 'admin' WHERE email = $1`,
+    [email]
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -133,13 +172,7 @@ test('register → add-to-cart → checkout purchase flow', async (t) => {
   // so that the connection pool in db/index.js can reach the test database.
   // eslint-disable-next-line global-require
   const supertest = require('supertest');
-  // eslint-disable-next-line global-require
-  const express = require('express');
-  // eslint-disable-next-line global-require
-  const loaders = require('../loaders');
-
-  const app = express();
-  loaders(app);
+  const app = loadFreshApp();
 
   const testPool = new Pool({ ...pgAdmin, database: TEST_DB });
   const productId = await seedProduct(testPool);
@@ -213,6 +246,58 @@ test('register → add-to-cart → checkout purchase flow', async (t) => {
 
     // Close the pool and Sequelize connection opened by db/index.js.
     const db = require('../db'); // eslint-disable-line global-require
+    await db.pool.end().catch(() => {});
+    await db.sequelize.close().catch(() => {});
+
+    await dropTestDb();
+  }
+});
+
+test('product mutations require admin access', async (t) => {
+  if (!(await pgAvailable())) {
+    t.skip('PostgreSQL is not reachable — skipping integration tests');
+    return;
+  }
+
+  await createTestDb();
+  runSetupDatabase();
+
+  const supertest = require('supertest');
+  const app = loadFreshApp();
+
+  const testPool = new Pool({ ...pgAdmin, database: TEST_DB });
+
+  try {
+    const registration = await supertest(app)
+      .post('/api/auth/register')
+      .send({ email: 'admin@example.com', name: 'Admin User', password: 'secret123' })
+      .expect(201);
+
+    await supertest(app)
+      .post('/api/products')
+      .set('Authorization', 'Bearer ' + registration.body.token)
+      .send({ name: 'Cherry Cola', price: 2.75, stock: 12 })
+      .expect(403);
+
+    await promoteUserToAdmin(testPool, 'admin@example.com');
+
+    const login = await supertest(app)
+      .post('/api/auth/login')
+      .send({ email: 'admin@example.com', password: 'secret123' })
+      .expect(200);
+
+    const createRes = await supertest(app)
+      .post('/api/products')
+      .set('Authorization', 'Bearer ' + login.body.token)
+      .send({ name: 'Cherry Cola', price: 2.75, stock: 12 })
+      .expect(201);
+
+    assert.equal(createRes.body.name, 'Cherry Cola');
+    assert.equal(createRes.body.stock, 12);
+  } finally {
+    await testPool.end();
+
+    const db = require('../db');
     await db.pool.end().catch(() => {});
     await db.sequelize.close().catch(() => {});
 
