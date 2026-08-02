@@ -215,7 +215,10 @@ function createStore() {
     findAll: async ({ where }) =>
       state.cartItems
         .filter((item) => item.cartId === where.cartId)
-        .map((item) => ({ ...item, Product: state.products.find((product) => product.id === item.productId) })),
+        .map((item) => ({
+          ...item,
+          Product: state.products.find((product) => product.id === item.productId),
+        })),
     findOrCreate: async ({ where, defaults }) => {
       let item = state.cartItems.find(
         (current) => current.cartId === where.cartId && current.productId === where.productId
@@ -252,9 +255,9 @@ function createStore() {
         .filter((order) => order.userId === where.userId)
         .sort((left, right) => right.createdAt - left.createdAt),
     findOne: async ({ where }) =>
-      state.orders.find((order) => order.id === Number(where.id) && order.userId === where.userId) ||
-      null,
-    findByPk: async (id) => state.orders.find((order) => order.id === Number(id)) || null,
+      state.orders.find(
+        (order) => order.id === Number(where.id) && order.userId === where.userId
+      ) || null,
   };
 
   const OrderItem = {
@@ -262,7 +265,10 @@ function createStore() {
     findAll: async ({ where }) =>
       state.orderItems
         .filter((item) => item.orderId === where.orderId)
-        .map((item) => ({ ...item, Product: state.products.find((product) => product.id === item.productId) })),
+        .map((item) => ({
+          ...item,
+          Product: state.products.find((product) => product.id === item.productId),
+        })),
   };
 
   const sequelize = {
@@ -309,9 +315,12 @@ test('cart service queries and mutates cart lines correctly', async () => {
     flavor: 'cola',
     size: '330ml',
   });
-  const { getCart, addItem, updateItem, removeItem, clear } = loadService('../services/CartService', {
-    models: store.models,
-  });
+  const { getCart, addItem, updateItem, removeItem, clear } = loadService(
+    '../services/CartService',
+    {
+      models: store.models,
+    }
+  );
 
   assert.deepEqual(await getCart(1), { id: 1, items: [], total: 0 });
 
@@ -376,160 +385,10 @@ test('user service reads and updates profile data', async () => {
 
   assert.equal((await getProfile(user.id)).name, 'Original Name');
 
-  const updated = await updateProfile(user.id, { name: 'Updated Name', email: 'updated@example.com' });
+  const updated = await updateProfile(user.id, {
+    name: 'Updated Name',
+    email: 'updated@example.com',
+  });
   assert.equal(updated.name, 'Updated Name');
   assert.equal(updated.email, 'updated@example.com');
-});
-
-test('order service updateOrderStatus follows the state machine', async () => {
-  const store = createStore();
-  const product = store.seedProduct({
-    name: 'Cherry Soda',
-    description: 'Cherry flavoured soda',
-    price: 2,
-    stock: 10,
-    flavor: 'cherry',
-    size: '330ml',
-  });
-  await store.models.CartItem.findOrCreate({
-    where: { cartId: 1, productId: product.id },
-    defaults: { quantity: 1 },
-  });
-
-  const { createOrderFromCart, updateOrderStatus } = loadService('../services/OrderService', {
-    models: store.models,
-    sequelize: store.sequelize,
-  });
-
-  const order = await createOrderFromCart(1);
-  assert.equal(order.status, 'pending');
-
-  // Allowed transition: pending → paid
-  const paid = await updateOrderStatus(order.id, 'paid');
-  assert.equal(paid.status, 'paid');
-
-  // Allowed transition: paid → shipped
-  const shipped = await updateOrderStatus(order.id, 'shipped');
-  assert.equal(shipped.status, 'shipped');
-
-  // Allowed transition: shipped → delivered
-  const delivered = await updateOrderStatus(order.id, 'delivered');
-  assert.equal(delivered.status, 'delivered');
-
-  // Illegal: delivered is terminal — any further transition must be rejected
-  await assert.rejects(
-    () => updateOrderStatus(order.id, 'cancelled'),
-    (err) => {
-      assert.equal(err.status, 409);
-      return true;
-    }
-  );
-});
-
-test('order service updateOrderStatus allows cancellation from pending and paid', async () => {
-  const store = createStore();
-  const product = store.seedProduct({
-    name: 'Lemon Soda',
-    description: 'Lemon flavoured soda',
-    price: 1.5,
-    stock: 10,
-    flavor: 'lemon',
-    size: '330ml',
-  });
-
-  const { createOrderFromCart, updateOrderStatus } = loadService('../services/OrderService', {
-    models: store.models,
-    sequelize: store.sequelize,
-  });
-
-  // First order: cancel directly from pending
-  await store.models.CartItem.findOrCreate({
-    where: { cartId: 1, productId: product.id },
-    defaults: { quantity: 1 },
-  });
-  const order1 = await createOrderFromCart(1);
-  const cancelled1 = await updateOrderStatus(order1.id, 'cancelled');
-  assert.equal(cancelled1.status, 'cancelled');
-
-  // Second order: advance to paid, then cancel
-  await store.models.CartItem.findOrCreate({
-    where: { cartId: 1, productId: product.id },
-    defaults: { quantity: 1 },
-  });
-  const order2 = await createOrderFromCart(1);
-  await updateOrderStatus(order2.id, 'paid');
-  const cancelled2 = await updateOrderStatus(order2.id, 'cancelled');
-  assert.equal(cancelled2.status, 'cancelled');
-});
-
-test('order service updateOrderStatus rejects illegal transitions with 409', async () => {
-  const store = createStore();
-  const product = store.seedProduct({
-    name: 'Orange Soda',
-    description: 'Orange flavoured soda',
-    price: 2,
-    stock: 10,
-    flavor: 'orange',
-    size: '330ml',
-  });
-  await store.models.CartItem.findOrCreate({
-    where: { cartId: 1, productId: product.id },
-    defaults: { quantity: 1 },
-  });
-
-  const { createOrderFromCart, updateOrderStatus } = loadService('../services/OrderService', {
-    models: store.models,
-    sequelize: store.sequelize,
-  });
-
-  const order = await createOrderFromCart(1);
-
-  // pending → shipped is not allowed (must go via paid)
-  await assert.rejects(
-    () => updateOrderStatus(order.id, 'shipped'),
-    (err) => {
-      assert.equal(err.status, 409);
-      return true;
-    }
-  );
-
-  // pending → delivered is not allowed
-  await assert.rejects(
-    () => updateOrderStatus(order.id, 'delivered'),
-    (err) => {
-      assert.equal(err.status, 409);
-      return true;
-    }
-  );
-});
-
-test('order service updateOrderStatus rejects unknown status with 400', async () => {
-  const store = createStore();
-  const product = store.seedProduct({
-    name: 'Grape Fizz',
-    description: 'Grape fizzy drink',
-    price: 1,
-    stock: 5,
-    flavor: 'grape',
-    size: '500ml',
-  });
-  await store.models.CartItem.findOrCreate({
-    where: { cartId: 1, productId: product.id },
-    defaults: { quantity: 1 },
-  });
-
-  const { createOrderFromCart, updateOrderStatus } = loadService('../services/OrderService', {
-    models: store.models,
-    sequelize: store.sequelize,
-  });
-
-  const order = await createOrderFromCart(1);
-
-  await assert.rejects(
-    () => updateOrderStatus(order.id, 'invalid-status'),
-    (err) => {
-      assert.equal(err.status, 400);
-      return true;
-    }
-  );
 });

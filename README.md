@@ -102,12 +102,12 @@ Interactive docs:
 
 See [`example.env`](example.env). Key ones:
 
-| Variable      | Purpose                          | Default                 |
-| ------------- | -------------------------------- | ----------------------- |
-| `PORT`        | HTTP port                        | `4001`                  |
-| `PGHOST` etc. | PostgreSQL connection            | localhost / soda_store  |
-| `JWT_SECRET`  | Secret used to sign tokens       | _change me_             |
-| `CORS_ORIGIN` | Allowed frontend origin(s)       | `http://localhost:3000` |
+| Variable      | Purpose                    | Default                 |
+| ------------- | -------------------------- | ----------------------- |
+| `PORT`        | HTTP port                  | `4001`                  |
+| `PGHOST` etc. | PostgreSQL connection      | localhost / soda_store  |
+| `JWT_SECRET`  | Secret used to sign tokens | _change me_             |
+| `CORS_ORIGIN` | Allowed frontend origin(s) | `http://localhost:3000` |
 
 ## API quick reference
 
@@ -169,13 +169,13 @@ curl -X POST http://localhost:4001/api/orders \
 
 ## Team & roles
 
-| Role                | Owner        | Area                                         |
-| ------------------- | ------------ | -------------------------------------------- |
-| Team Lead           | Hector & Eraj| Review / merge, timeline                     |
-| Database Engineer   | Renee        | `db/`, `setupDatabase.js`, `models/`, ERD    |
-| Back-End Developer  | Kyle         | `loaders/`, `routes/`, `services/`, swagger  |
-| Front-End Developer | Dubem        | Frontend app (separate repo) → this API      |
-| Docs + GitHub Lead  | Goodness     | `.gitignore`, `README.md`, guides            |
+| Role                | Owner         | Area                                        |
+| ------------------- | ------------- | ------------------------------------------- |
+| Team Lead           | Hector & Eraj | Review / merge, timeline                    |
+| Database Engineer   | Renee         | `db/`, `setupDatabase.js`, `models/`, ERD   |
+| Back-End Developer  | Kyle          | `loaders/`, `routes/`, `services/`, swagger |
+| Front-End Developer | Dubem         | Frontend app (separate repo) → this API     |
+| Docs + GitHub Lead  | Goodness      | `.gitignore`, `README.md`, guides           |
 
 ## License
 
