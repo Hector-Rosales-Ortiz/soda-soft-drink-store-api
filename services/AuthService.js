@@ -21,6 +21,7 @@ function publicUser(user) {
     id: user.id,
     email: user.email,
     name: user.name,
+    role: user.role,
     created_at: user.createdAt,
   };
 }
@@ -75,7 +76,7 @@ async function login({ email, password }) {
 
 function signToken(user) {
   return jwt.sign(
-    { sub: user.id, email: user.email },
+    { sub: user.id, email: user.email, role: user.role },
     config.jwt.secret,
     { expiresIn: config.jwt.expiresIn }
   );

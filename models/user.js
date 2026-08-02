@@ -25,6 +25,12 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: false,
       },
+      role: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: 'customer',
+        validate: { isIn: [['customer', 'admin']] },
+      },
     },
     {
       tableName: 'users',

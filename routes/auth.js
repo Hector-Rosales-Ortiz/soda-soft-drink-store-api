@@ -7,13 +7,15 @@ const AuthService = require('../services/AuthService');
 
 const router = express.Router();
 
-/** Rate-limit: max 10 auth attempts per 15 minutes per IP. */
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests, please try again later.' },
+  message: {
+    error: 'Too many authentication attempts, please try again later.',
+    code: 'AUTH_RATE_LIMITED',
+  },
 });
 
 /** POST /api/auth/register — create an account and return a JWT. */
