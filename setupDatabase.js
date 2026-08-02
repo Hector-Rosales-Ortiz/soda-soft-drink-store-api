@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('node:fs');
+const path = require('node:path');
 const { Pool } = require('pg');
 const { spawnSync } = require('node:child_process');
 const path = require('node:path');
@@ -34,49 +36,76 @@ async function ensureDatabase() {
   }
 }
 
-function createDatabaseUrl() {
-  const databaseUrl = new URL('postgres://localhost');
-  databaseUrl.hostname = dbConfig.host;
-  databaseUrl.port = String(dbConfig.port);
-  databaseUrl.pathname = `/${targetDatabase}`;
-  databaseUrl.username = dbConfig.user;
-  databaseUrl.password = dbConfig.password;
-
-  return databaseUrl.toString();
+async function getTargetPool() {
+  return new Pool({
+    ...dbConfig,
+    database: targetDatabase,
+  });
 }
 
-function runMigrations() {
-  const sequelizeCliEntry = require.resolve('sequelize-cli/lib/sequelize');
-  const migrationsPath = path.resolve(__dirname, 'db', 'migrations');
+async function resetSchema(pool) {
+  await pool.query('DROP TABLE IF EXISTS migrations');
+  await pool.query('DROP TABLE IF EXISTS order_items');
+  await pool.query('DROP TABLE IF EXISTS orders');
+  await pool.query('DROP TABLE IF EXISTS cart_items');
+  await pool.query('DROP TABLE IF EXISTS carts');
+  await pool.query('DROP TABLE IF EXISTS products');
+  await pool.query('DROP TABLE IF EXISTS users');
+}
 
-  console.log('🔄 Running database migrations...');
+async function runMigrations(pool) {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS migrations (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) UNIQUE NOT NULL,
+      executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 
-  const result = spawnSync(
-    process.execPath,
-    [sequelizeCliEntry, 'db:migrate', '--url', createDatabaseUrl(), '--migrations-path', migrationsPath],
-    {
-      cwd: __dirname,
-      env: { ...process.env, NODE_ENV: process.env.NODE_ENV || 'development' },
-      stdio: 'inherit',
+  const migrationsDir = path.join(__dirname, 'migrations');
+  const migrationFiles = fs
+    .readdirSync(migrationsDir)
+    .filter((fileName) => fileName.endsWith('.js'))
+    .sort();
+
+  for (const fileName of migrationFiles) {
+    const migration = require(path.join(migrationsDir, fileName));
+    const applied = await pool.query('SELECT 1 FROM migrations WHERE name = $1', [migration.name || fileName]);
+
+    if (applied.rowCount > 0) {
+      continue;
     }
-  );
 
-  if (result.status !== 0) {
-    throw new Error('Migration command failed');
+    console.log(`🔄 Running migration ${fileName}...`);
+    await migration.up(pool);
+    await pool.query('INSERT INTO migrations (name) VALUES ($1)', [migration.name || fileName]);
+    console.log(`✅ Applied migration ${fileName}`);
   }
-
-  console.log('✅ Migrations completed successfully!');
 }
 
 async function main() {
+  let pool;
   let exitCode = 0;
 
   try {
     await ensureDatabase();
-    runMigrations();
+    pool = await getTargetPool();
+
+    if (process.argv.includes('--force')) {
+      console.log('🔄 Resetting schema...');
+      await resetSchema(pool);
+    }
+
+    console.log('🔄 Running migrations...');
+    await runMigrations(pool);
+    console.log('✅ All migrations completed successfully!');
   } catch (err) {
     console.error('❌ Error creating database or running migrations:', err);
     exitCode = 1;
+  } finally {
+    if (pool) {
+      await pool.end().catch((err) => console.error('Pool cleanup error:', err));
+    }
   }
 
   process.exit(exitCode);

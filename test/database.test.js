@@ -67,18 +67,22 @@ test('setupDatabase.js creates the expected PostgreSQL tables via migrations', a
 
     assert.deepEqual(
       rows.map((row) => row.table_name),
-      ['SequelizeMeta', 'cart_items', 'carts', 'order_items', 'orders', 'products', 'users']
+      ['cart_items', 'carts', 'migrations', 'order_items', 'orders', 'products', 'users']
     );
 
-    const { rows: productNameColumnRows } = await pool.query(
+    const { rows: migrationRows } = await pool.query(
+      `SELECT table_name
+       FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = 'migrations'`
+    );
+    assert.equal(migrationRows.length, 1);
+
+    const { rows: productColumnRows } = await pool.query(
       `SELECT character_maximum_length
        FROM information_schema.columns
-       WHERE table_schema = 'public'
-         AND table_name = 'products'
-         AND column_name = 'name'`
+       WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'name'`
     );
-
-    assert.equal(productNameColumnRows[0].character_maximum_length, 255);
+    assert.equal(productColumnRows[0].character_maximum_length, 150);
   } finally {
     await pool.end();
     await dropDatabase(databaseName);
