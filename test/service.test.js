@@ -319,6 +319,7 @@ test('cart service queries and mutates cart lines correctly', async () => {
     '../services/CartService',
     {
       models: store.models,
+      sequelize: store.sequelize,
     }
   );
 
