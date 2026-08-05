@@ -28,10 +28,10 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
@@ -47,6 +47,7 @@ jobs:
         env:
           DB_USER: postgres
           DB_HOST: localhost
+          DB_NAME: postgres
           DB_PASSWORD: postgres
           DB_PORT: 5432
           JWT_SECRET: ci_test_secret_not_for_production
