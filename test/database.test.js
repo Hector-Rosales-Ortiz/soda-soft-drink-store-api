@@ -37,7 +37,7 @@ async function dropDatabase(databaseName) {
   }
 }
 
-test('setupDatabase.js creates the expected PostgreSQL tables via migrations', async () => {
+async function createTestDatabase() {
   const databaseName = createTestDatabaseName();
   const env = { ...process.env, DB_NAME: databaseName };
 
@@ -59,7 +59,7 @@ test('setupDatabase.js creates the expected PostgreSQL tables via migrations', a
     await dropDatabase(databaseName);
   };
   return { pool, cleanup };
-}
+}; 
 
 test('setupDatabase.js creates the expected PostgreSQL tables', async () => {
   const { pool, cleanup } = await createTestDatabase();

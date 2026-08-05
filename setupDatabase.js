@@ -4,7 +4,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Pool } = require('pg');
 const { spawnSync } = require('node:child_process');
-const path = require('node:path');
 require('dotenv').config();
 const config = require('./config');
 
