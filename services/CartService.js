@@ -60,7 +60,7 @@ async function addItem(userId, { productId, quantity = 1 }) {
   // Wrap the stock-check + cart-item upsert in a transaction with a
   // row-level lock on the product.  This prevents two concurrent addItem
   // calls from both passing the stock check and together overselling stock.
-  return sequelize.transaction(async (t) => {
+  await sequelize.transaction(async (t) => {
     const product = await Product.findByPk(productId, {
       lock: t.LOCK.UPDATE,
       transaction: t,
@@ -80,9 +80,8 @@ async function addItem(userId, { productId, quantity = 1 }) {
       item.quantity = newQty;
       await item.save({ transaction: t });
     }
-
-    return getCart(userId);
   });
+  return getCart(userId);
 }
 
 async function updateItem(userId, productId, quantity) {
