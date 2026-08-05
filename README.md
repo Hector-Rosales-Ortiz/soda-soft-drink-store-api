@@ -43,8 +43,6 @@ Request flow: **routes → services → models (Sequelize) → db**.
 ```bash
 # 1. Install dependencies
 npm install
-#   If npm leaves partial packages behind on Windows/OneDrive:
-#   npm run repair-install
 
 # 2. Configure environment
 cp example.env .env        # (Windows: copy example.env .env)
@@ -88,6 +86,17 @@ The test coverage currently includes:
 - An Express smoke test for `/health` and the 404 handler
 
 See [TESTING.md](TESTING.md) for the full test workflow and environment notes.
+
+## Linting and formatting
+
+ESLint (flat config, `eslint.config.js`) and Prettier run in CI on every pull
+request:
+
+```bash
+npm run lint            # ESLint
+npm run format-check    # Prettier, check only
+npm run format          # Prettier, rewrite in place
+```
 
 The server prints its URL on boot (default <http://localhost:4001>).
 Interactive docs:
