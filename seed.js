@@ -191,13 +191,16 @@ async function seedProducts(pool, reset) {
   } else {
     const { rowCount } = await pool.query('SELECT 1 FROM products LIMIT 1');
     if (rowCount > 0) {
-      console.log('ℹ️  Products table already contains rows — skipping product seed (use --reset to reload)');
+      console.log(
+        'ℹ️  Products table already contains rows — skipping product seed (use --reset to reload)'
+      );
       return;
     }
   }
 
   const placeholders = PRODUCTS.map(
-    (_, i) => `($${i * 7 + 1}, $${i * 7 + 2}, $${i * 7 + 3}, $${i * 7 + 4}, $${i * 7 + 5}, $${i * 7 + 6}, $${i * 7 + 7})`
+    (_, i) =>
+      `($${i * 7 + 1}, $${i * 7 + 2}, $${i * 7 + 3}, $${i * 7 + 4}, $${i * 7 + 5}, $${i * 7 + 6}, $${i * 7 + 7})`
   ).join(', ');
 
   const values = PRODUCTS.flatMap((p) => [

@@ -59,7 +59,7 @@ async function createTestDatabase() {
     await dropDatabase(databaseName);
   };
   return { pool, cleanup };
-}; 
+}
 
 test('setupDatabase.js creates the expected PostgreSQL tables', async () => {
   const { pool, cleanup } = await createTestDatabase();
@@ -100,7 +100,9 @@ test('CHECK constraints reject invalid values', async () => {
 
   try {
     // Seed a user row so FK constraints are satisfied for orders.
-    const { rows: [user] } = await pool.query(
+    const {
+      rows: [user],
+    } = await pool.query(
       `INSERT INTO users (email, name, password_hash)
        VALUES ('check@example.com', 'Check User', 'hash')
        RETURNING id`
@@ -109,40 +111,54 @@ test('CHECK constraints reject invalid values', async () => {
     // products.price must be >= 0
     await assert.rejects(
       pool.query(`INSERT INTO products (name, price, stock) VALUES ('Bad Price', -1.00, 0)`),
-      (err) => { assert.match(err.message, /chk_products_price_non_negative|check/i); return true; }
+      (err) => {
+        assert.match(err.message, /chk_products_price_non_negative|check/i);
+        return true;
+      }
     );
 
     // products.stock must be >= 0
     await assert.rejects(
       pool.query(`INSERT INTO products (name, price, stock) VALUES ('Bad Stock', 1.00, -5)`),
-      (err) => { assert.match(err.message, /chk_products_stock_non_negative|check/i); return true; }
+      (err) => {
+        assert.match(err.message, /chk_products_stock_non_negative|check/i);
+        return true;
+      }
     );
 
     // Seed a valid product for FK use.
-    const { rows: [product] } = await pool.query(
+    const {
+      rows: [product],
+    } = await pool.query(
       `INSERT INTO products (name, price, stock) VALUES ('Good Soda', 2.00, 10) RETURNING id`
     );
 
     // orders.status must be one of the allowed values
     await assert.rejects(
-      pool.query(
-        `INSERT INTO orders (user_id, total, status) VALUES ($1, 5.00, 'unknown')`,
-        [user.id]
-      ),
-      (err) => { assert.match(err.message, /chk_orders_status_valid|check/i); return true; }
+      pool.query(`INSERT INTO orders (user_id, total, status) VALUES ($1, 5.00, 'unknown')`, [
+        user.id,
+      ]),
+      (err) => {
+        assert.match(err.message, /chk_orders_status_valid|check/i);
+        return true;
+      }
     );
 
     // orders.total must be >= 0
     await assert.rejects(
-      pool.query(
-        `INSERT INTO orders (user_id, total, status) VALUES ($1, -1.00, 'pending')`,
-        [user.id]
-      ),
-      (err) => { assert.match(err.message, /chk_orders_total_non_negative|check/i); return true; }
+      pool.query(`INSERT INTO orders (user_id, total, status) VALUES ($1, -1.00, 'pending')`, [
+        user.id,
+      ]),
+      (err) => {
+        assert.match(err.message, /chk_orders_total_non_negative|check/i);
+        return true;
+      }
     );
 
     // Seed a valid order for FK use.
-    const { rows: [order] } = await pool.query(
+    const {
+      rows: [order],
+    } = await pool.query(
       `INSERT INTO orders (user_id, total, status) VALUES ($1, 5.00, 'pending') RETURNING id`,
       [user.id]
     );
@@ -154,7 +170,10 @@ test('CHECK constraints reject invalid values', async () => {
          VALUES ($1, $2, 0, 2.00)`,
         [order.id, product.id]
       ),
-      (err) => { assert.match(err.message, /chk_order_items_quantity_positive|check/i); return true; }
+      (err) => {
+        assert.match(err.message, /chk_order_items_quantity_positive|check/i);
+        return true;
+      }
     );
 
     // order_items.price must be >= 0
@@ -164,14 +183,16 @@ test('CHECK constraints reject invalid values', async () => {
          VALUES ($1, $2, 1, -0.01)`,
         [order.id, product.id]
       ),
-      (err) => { assert.match(err.message, /chk_order_items_price_non_negative|check/i); return true; }
+      (err) => {
+        assert.match(err.message, /chk_order_items_price_non_negative|check/i);
+        return true;
+      }
     );
 
     // Seed a valid cart so FK constraint is satisfied.
-    const { rows: [cart] } = await pool.query(
-      `INSERT INTO carts (user_id) VALUES ($1) RETURNING id`,
-      [user.id]
-    );
+    const {
+      rows: [cart],
+    } = await pool.query(`INSERT INTO carts (user_id) VALUES ($1) RETURNING id`, [user.id]);
 
     // cart_items.quantity must be >= 1
     await assert.rejects(
@@ -180,7 +201,10 @@ test('CHECK constraints reject invalid values', async () => {
          VALUES ($1, $2, 0)`,
         [cart.id, product.id]
       ),
-      (err) => { assert.match(err.message, /chk_cart_items_quantity_positive|check/i); return true; }
+      (err) => {
+        assert.match(err.message, /chk_cart_items_quantity_positive|check/i);
+        return true;
+      }
     );
   } finally {
     await cleanup();
