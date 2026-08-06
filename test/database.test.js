@@ -15,9 +15,11 @@ const adminConfig = {
   password: process.env.DB_PASSWORD || process.env.PGPASSWORD || 'postgres',
   port: parseInt(process.env.DB_PORT || process.env.PGPORT || '5432', 10) || 5432,
 };
+// keep track of the number of databases created
+let dbCounter = 0;
 
 function createTestDatabaseName() {
-  return `soda_soft_drink_store_test_${Date.now()}`;
+  return `soda_soft_drink_store_test_${Date.now()}_${process.pid}_${dbCounter++}`;
 }
 
 async function dropDatabase(databaseName) {
@@ -46,12 +48,12 @@ async function createTestDatabase() {
     env,
     encoding: 'utf8',
   });
-
-  assert.equal(
-    result.status,
-    0,
-    `setupDatabase.js failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
-  );
+  // check result status
+  if (result.status !== 0) {
+    // drop database if setupDatabase.js failed
+    await dropDatabase(databaseName); // clean up
+    assert.fail(`setupDatabase.js failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  }
 
   const pool = new Pool({ ...adminConfig, database: databaseName });
   const cleanup = async () => {
