@@ -18,12 +18,19 @@
  * never collides with the application database.
  */
 
-// ─── Database name must be set BEFORE any module that reads DB config is
-// ─── required (config.js and db/index.js are both lazy-required below).
+// ─── Each test mints its own database name and publishes it to the environment
+// ─── BEFORE any module that reads DB config is required (config.js and
+// ─── db/index.js are both lazy-required below, and loadFreshApp() clears them
+// ─── from the require cache so each test picks up its own name).
 const baseName = process.env.DB_NAME || process.env.PGDATABASE || 'soda_store';
-const TEST_DB = `${baseName}_integration_test_${Date.now()}`;
-process.env.DB_NAME = TEST_DB;
-process.env.PGDATABASE = TEST_DB;
+let dbCounter = 0;
+
+function useTestDb() {
+  const name = `${baseName}_integration_test_${Date.now()}_${process.pid}_${dbCounter++}`;
+  process.env.DB_NAME = name;
+  process.env.PGDATABASE = name;
+  return name;
+}
 
 // Provide a stable JWT secret for the test run if none is set.
 if (!process.env.JWT_SECRET) {
@@ -81,10 +88,10 @@ async function pgAvailable() {
 }
 
 /** Create the isolated test database. */
-async function createTestDb() {
+async function createTestDb(name) {
   const pool = new Pool({ ...pgAdmin, database: 'postgres' });
   try {
-    await pool.query(`CREATE DATABASE "${TEST_DB}"`);
+    await pool.query(`CREATE DATABASE "${name}"`);
   } finally {
     await pool.end();
   }
@@ -94,16 +101,16 @@ async function createTestDb() {
  * Drop the isolated test database, terminating any lingering connections
  * first so that the DROP succeeds even if a connection is still open.
  */
-async function dropTestDb() {
+async function dropTestDb(name) {
   const pool = new Pool({ ...pgAdmin, database: 'postgres' });
   try {
     await pool.query(
       `SELECT pg_terminate_backend(pid)
        FROM pg_stat_activity
        WHERE datname = $1 AND pid <> pg_backend_pid()`,
-      [TEST_DB]
+      [name]
     );
-    await pool.query(`DROP DATABASE IF EXISTS "${TEST_DB}"`);
+    await pool.query(`DROP DATABASE IF EXISTS "${name}"`);
   } finally {
     await pool.end();
   }
@@ -162,18 +169,23 @@ test('register → add-to-cart → checkout purchase flow', async (t) => {
     return;
   }
 
-  await createTestDb();
-  runSetupDatabase();
-
-  // Require app modules only AFTER the database has been created and seeded
-  // so that the connection pool in db/index.js can reach the test database.
-  const supertest = require('supertest');
-  const app = loadFreshApp();
-
-  const testPool = new Pool({ ...pgAdmin, database: TEST_DB });
-  const productId = await seedProduct(testPool);
+  // variables to track the db connection
+  const testDb = useTestDb();
+  let testPool = null;
+  let db = null;
 
   try {
+    await createTestDb(testDb); // create the isolated test database when needed
+    runSetupDatabase(); // run setupDatabase.js as a child process
+
+    // require app modules only AFTER the database has been set up
+    // so that the connection pool in db/index.js can reach the test database
+    const supertest = require('supertest');
+    testPool = new Pool({ ...pgAdmin, database: testDb });
+    const productId = await seedProduct(testPool);
+
+    const app = loadFreshApp();
+    db = require('../db');
     // ── 1. Register a new account ────────────────────────────────────────────
     const registerRes = await supertest(app)
       .post('/api/auth/register')
@@ -238,14 +250,12 @@ test('register → add-to-cart → checkout purchase flow', async (t) => {
     assert.equal(getRes.body.items[0].product_id, productId);
   } finally {
     // ── Clean up: close all DB connections then drop the test database ────────
-    await testPool.end();
-
-    // Close the pool and Sequelize connection opened by db/index.js.
-    const db = require('../db');
-    await db.pool.end().catch(() => {});
-    await db.sequelize.close().catch(() => {});
-
-    await dropTestDb();
+    if (testPool) await testPool.end(); // just in case
+    if (db) {
+      await db.pool.end().catch(() => {});
+      await db.sequelize.close().catch(() => {});
+    }
+    await dropTestDb(testDb);
   }
 });
 
@@ -254,16 +264,22 @@ test('product mutations require admin access', async (t) => {
     t.skip('PostgreSQL is not reachable — skipping integration tests');
     return;
   }
-
-  await createTestDb();
-  runSetupDatabase();
-
-  const supertest = require('supertest');
-  const app = loadFreshApp();
-
-  const testPool = new Pool({ ...pgAdmin, database: TEST_DB });
+  // variable to track db connection
+  const testDb = useTestDb();
+  let testPool = null;
+  let db = null;
 
   try {
+    await createTestDb(testDb); // create the isolated test database when needed
+    runSetupDatabase(); // run setupDatabase.js as a child process
+
+    // require supertest
+    const supertest = require('supertest');
+    const app = loadFreshApp();
+    db = require('../db');
+
+    testPool = new Pool({ ...pgAdmin, database: testDb });
+
     const registration = await supertest(app)
       .post('/api/auth/register')
       .send({ email: 'admin@example.com', name: 'Admin User', password: 'secret123' })
@@ -291,12 +307,12 @@ test('product mutations require admin access', async (t) => {
     assert.equal(createRes.body.name, 'Cherry Cola');
     assert.equal(createRes.body.stock, 12);
   } finally {
-    await testPool.end();
-
-    const db = require('../db');
-    await db.pool.end().catch(() => {});
-    await db.sequelize.close().catch(() => {});
-
-    await dropTestDb();
+    if (testPool) await testPool.end(); // just in case the test pool is still open
+    if (db) {
+      // if the db is still open, close it
+      await db.pool.end().catch(() => {});
+      await db.sequelize.close().catch(() => {});
+    }
+    await dropTestDb(testDb);
   }
 });
