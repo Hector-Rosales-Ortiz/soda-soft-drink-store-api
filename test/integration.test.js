@@ -151,10 +151,7 @@ async function seedProduct(pool) {
 }
 
 async function promoteUserToAdmin(pool, email) {
-  await pool.query(
-    `UPDATE users SET role = 'admin' WHERE email = $1`,
-    [email]
-  );
+  await pool.query(`UPDATE users SET role = 'admin' WHERE email = $1`, [email]);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -170,7 +167,6 @@ test('register → add-to-cart → checkout purchase flow', async (t) => {
 
   // Require app modules only AFTER the database has been created and seeded
   // so that the connection pool in db/index.js can reach the test database.
-  // eslint-disable-next-line global-require
   const supertest = require('supertest');
   const app = loadFreshApp();
 
@@ -245,7 +241,7 @@ test('register → add-to-cart → checkout purchase flow', async (t) => {
     await testPool.end();
 
     // Close the pool and Sequelize connection opened by db/index.js.
-    const db = require('../db'); // eslint-disable-line global-require
+    const db = require('../db');
     await db.pool.end().catch(() => {});
     await db.sequelize.close().catch(() => {});
 

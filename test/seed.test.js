@@ -70,10 +70,9 @@ test('seed.js inserts 15 products and a demo user into a fresh database', async 
     assert.equal(Number(productRows[0].cnt), 15, 'Expected 15 seeded products');
 
     // Verify demo user exists.
-    const { rows: userRows } = await pool.query(
-      'SELECT email, name FROM users WHERE email = $1',
-      ['demo@sodastore.example']
-    );
+    const { rows: userRows } = await pool.query('SELECT email, name FROM users WHERE email = $1', [
+      'demo@sodastore.example',
+    ]);
     assert.equal(userRows.length, 1, 'Expected demo user to exist');
     assert.equal(userRows[0].name, 'Demo User');
 
@@ -119,11 +118,7 @@ test('seed.js inserts 15 products and a demo user into a fresh database', async 
     );
 
     const { rows: afterReset } = await pool.query('SELECT COUNT(*) AS cnt FROM products');
-    assert.equal(
-      Number(afterReset[0].cnt),
-      15,
-      'Expected 15 products after --reset'
-    );
+    assert.equal(Number(afterReset[0].cnt), 15, 'Expected 15 products after --reset');
   } finally {
     await pool.end();
     await dropDatabase(databaseName);

@@ -3,8 +3,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { Pool } = require('pg');
-const { spawnSync } = require('node:child_process');
-const path = require('node:path');
 require('dotenv').config();
 const config = require('./config');
 
@@ -72,7 +70,9 @@ async function runMigrations(pool) {
 
   for (const fileName of migrationFiles) {
     const migration = require(path.join(migrationsDir, fileName));
-    const applied = await pool.query('SELECT 1 FROM migrations WHERE name = $1', [migration.name || fileName]);
+    const applied = await pool.query('SELECT 1 FROM migrations WHERE name = $1', [
+      migration.name || fileName,
+    ]);
 
     if (applied.rowCount > 0) {
       continue;
